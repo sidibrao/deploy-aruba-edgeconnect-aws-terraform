@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-bucket="${1:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}"
-region="${2:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}"
-state_key="${3:-sdwan/v4/terraform.tfstate}"
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+bucket="$(trim "${1:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}")"
+region="$(trim "${2:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}")"
+state_key="$(trim "${3:-sdwan/v4/terraform.tfstate}")"
 
 if aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then
   echo "State bucket already exists: $bucket"
