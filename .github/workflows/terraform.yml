@@ -68,6 +68,9 @@ jobs:
         with:
           terraform_version: "1.15.5"
 
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
       - name: Ensure state backend prerequisites
         run: bash scripts/bootstrap-state.sh "$TF_STATE_BUCKET" "$AWS_REGION" "$TF_STATE_KEY"
 
@@ -88,9 +91,6 @@ jobs:
 
       - name: Terraform init
         run: terraform init -backend-config=backend.hcl
-
-      - name: Terraform fmt
-        run: terraform fmt -check -recursive
 
       - name: Terraform validate
         run: terraform validate
