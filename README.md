@@ -30,6 +30,8 @@ backend.
 │   ├── bootstrap-state.yml        # Creates/verifies S3 backend prerequisites
 │   └── terraform.yml              # Terraform fmt, validate, plan, and apply
 ├── bootstrap/                     # Optional standalone Terraform state bootstrap
+├── config/
+│   └── deployment.env             # Project deployment defaults
 ├── docs/
 │   ├── architecture.md            # Current architecture notes
 │   ├── bootstrap.md               # Manual backend bootstrap runbook
@@ -59,8 +61,7 @@ Use GitHub Actions as the source of truth for the final deployment.
 
 1. Configure the AWS IAM role trust policy so this repo can assume it through
    GitHub OIDC.
-2. Add GitHub repository variables such as `AWS_ROLE_ARN`, `TF_STATE_BUCKET`,
-   `TF_RESTRICTED_IP`, and `TF_KEY_PAIR_NAME`.
+2. Add the GitHub repository variable `AWS_ROLE_ARN`.
 3. Run the `Bootstrap Terraform State` workflow.
 4. Run the `Terraform SD-WAN` workflow with `apply = false`.
 5. Review the plan.
@@ -69,7 +70,26 @@ Use GitHub Actions as the source of truth for the final deployment.
 See [docs/github-actions.md](docs/github-actions.md) for the complete GitHub
 setup.
 
-## Required GitHub Variables
+## Deployment Defaults
+
+Project-owned deployment defaults live in:
+
+```text
+config/deployment.env
+```
+
+Current defaults:
+
+```text
+AWS_REGION=us-east-2
+TF_STATE_BUCKET=ec-sdwan-aws-s3
+TF_STATE_KEY=sdwan/v4/terraform.tfstate
+```
+
+Update that file when you want to change the project state bucket for both local
+helper scripts and GitHub Actions.
+
+## Required GitHub Variable
 
 Set these under:
 
@@ -80,6 +100,11 @@ Settings -> Secrets and variables -> Actions -> Variables
 | Variable | Example |
 |---|---|
 | `AWS_ROLE_ARN` | `arn:aws:iam::609330918629:role/<role-name>` |
+
+GitHub variables can optionally override values from `config/deployment.env`:
+
+| Optional Override | Example |
+|---|---|
 | `TF_STATE_BUCKET` | `ec-sdwan-aws-s3` |
 | `AWS_REGION` | `us-east-2` |
 | `TF_STATE_KEY` | `sdwan/v4/terraform.tfstate` |

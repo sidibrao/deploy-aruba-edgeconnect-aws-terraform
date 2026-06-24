@@ -6,6 +6,7 @@ variable "aws_region" {
 
 variable "state_bucket_name" {
   type        = string
+  default     = "ec-sdwan-aws-s3"
   description = "Globally unique S3 bucket name for Terraform remote state."
 
   validation {

@@ -8,9 +8,16 @@ trim() {
   printf '%s' "$value"
 }
 
-bucket="$(trim "${1:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}")"
-region="$(trim "${2:?Usage: bootstrap-state.sh <bucket> <region> [state-key]}")"
-state_key="$(trim "${3:-sdwan/v4/terraform.tfstate}")"
+if [ $# -lt 2 ] && [ -f "config/deployment.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . config/deployment.env
+  set +a
+fi
+
+bucket="$(trim "${1:-${TF_STATE_BUCKET:?Set TF_STATE_BUCKET or pass bucket as the first argument}}")"
+region="$(trim "${2:-${AWS_REGION:-us-east-2}}")"
+state_key="$(trim "${3:-${TF_STATE_KEY:-sdwan/v4/terraform.tfstate}}")"
 
 if aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then
   echo "State bucket already exists: $bucket"

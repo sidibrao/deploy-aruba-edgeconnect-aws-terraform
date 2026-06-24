@@ -8,8 +8,9 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
-  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'sdwan/v4/terraform.tfstate' }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
 
 jobs:
   bootstrap-state:
@@ -20,20 +21,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Load deployment defaults
+        id: deployment
+        run: bash scripts/load-deployment-env.sh
+
       - name: Check required repository variables
         run: |
           test -n "${{ vars.AWS_ROLE_ARN }}" || (echo "Missing repository variable AWS_ROLE_ARN" && exit 1)
-          test -n "${{ vars.TF_STATE_BUCKET }}" || (echo "Missing repository variable TF_STATE_BUCKET" && exit 1)
 
       - name: Configure AWS credentials
         uses: sidibrao/configure-aws-credentials-sid@main
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || steps.deployment.outputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           role-session-name: sdwan-bootstrap
 
       - name: Bootstrap state bucket
-        run: bash scripts/bootstrap-state.sh "${{ vars.TF_STATE_BUCKET }}" "${{ env.AWS_REGION }}" "${{ env.TF_STATE_KEY }}"
+        run: bash scripts/bootstrap-state.sh "$TF_STATE_BUCKET" "$AWS_REGION" "$TF_STATE_KEY"
 
       - name: Verify caller
         run: aws sts get-caller-identity

@@ -51,21 +51,46 @@ BranchName         = main
 RoleName           = sdwan-terraform-github-actions
 ```
 
-## Required Repository Variables
+## Deployment Defaults
+
+The S3 state bucket, AWS region, and state key are defined in:
+
+```text
+config/deployment.env
+```
+
+Current defaults:
+
+```text
+AWS_REGION=us-east-2
+TF_STATE_BUCKET=ec-sdwan-aws-s3
+TF_STATE_KEY=sdwan/v4/terraform.tfstate
+```
+
+Change this file in VS Code and push it when you want the project to use a
+different S3 state bucket. GitHub repository variables with the same names can
+still override these defaults, but they are no longer required.
+
+## Required Repository Variable
 
 Set these in GitHub under `Settings -> Secrets and variables -> Actions -> Variables`.
 
 | Variable | Required | Example |
 |---|---:|---|
 | `AWS_ROLE_ARN` | Yes | `arn:aws:iam::609330918629:role/sdwan-terraform-github-actions` |
-| `TF_STATE_BUCKET` | Yes | `ec-sdwan-aws-s3` |
-| `AWS_REGION` | No | `us-east-2` |
-| `TF_STATE_KEY` | No | `sdwan/v4/terraform.tfstate` |
-| `TF_NAME_PREFIX` | No | `sdwan-v4-lab` |
-| `TF_KEY_PAIR_NAME` | Recommended | `AWS-sid-EC-KP` |
-| `TF_RESTRICTED_IP` | Recommended | `184.147.66.76/32` |
-| `TF_ARUBA_AMI_ID` | Recommended | `ami-02907b22e4a6ce1bd` |
-| `TF_ALB_CERTIFICATE_ARN` | Optional | ACM certificate ARN for HTTPS |
+
+Optional overrides:
+
+| Variable | Example |
+|---|---|
+| `TF_STATE_BUCKET` | `ec-sdwan-aws-s3` |
+| `AWS_REGION` | `us-east-2` |
+| `TF_STATE_KEY` | `sdwan/v4/terraform.tfstate` |
+| `TF_NAME_PREFIX` | `sdwan-v4-lab` |
+| `TF_KEY_PAIR_NAME` | `AWS-sid-EC-KP` |
+| `TF_RESTRICTED_IP` | `184.147.66.76/32` |
+| `TF_ARUBA_AMI_ID` | `ami-02907b22e4a6ce1bd` |
+| `TF_ALB_CERTIFICATE_ARN` | ACM certificate ARN for HTTPS |
 
 Other optional variables supported by the workflow:
 
