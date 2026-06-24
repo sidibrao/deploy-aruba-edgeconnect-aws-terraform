@@ -4,18 +4,35 @@ set -euo pipefail
 out="${1:-github.auto.tfvars}"
 : > "$out"
 
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+escape_hcl_string() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
 write_string() {
   local name="$1"
-  local value="$2"
+  local value
+  value="$(trim "$2")"
 
   if [ -n "$value" ]; then
+    value="$(escape_hcl_string "$value")"
     printf '%s = "%s"\n' "$name" "$value" >> "$out"
   fi
 }
 
 write_number() {
   local name="$1"
-  local value="$2"
+  local value
+  value="$(trim "$2")"
 
   if [ -n "$value" ]; then
     printf '%s = %s\n' "$name" "$value" >> "$out"
