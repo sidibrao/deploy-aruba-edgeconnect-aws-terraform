@@ -22,7 +22,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     GitHubOrganization=sidibrao \
-    RepositoryName=deploy-aruba-edgeconnect-aws-treeaform \
+    RepositoryName=deploy-aruba-edgeconnect-aws-terraform \
     BranchName=main \
     RoleName=sdwan-terraform-github-actions \
     UseExistingProvider=no
@@ -46,7 +46,7 @@ Recommended trust inputs for this repository:
 
 ```text
 GitHubOrganization = sidibrao
-RepositoryName     = deploy-aruba-edgeconnect-aws-treeaform
+RepositoryName     = deploy-aruba-edgeconnect-aws-terraform
 BranchName         = main
 RoleName           = sdwan-terraform-github-actions
 ```

@@ -11,7 +11,7 @@ Parameters:
   RepositoryName:
     Type: String
     Description: GitHub repository allowed to assume this role.
-    Default: deploy-aruba-edgeconnect-aws-treeaform
+    Default: deploy-aruba-edgeconnect-aws-terraform
 
   BranchName:
     Type: String
