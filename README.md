@@ -80,7 +80,7 @@ Settings -> Secrets and variables -> Actions -> Variables
 | Variable | Example |
 |---|---|
 | `AWS_ROLE_ARN` | `arn:aws:iam::609330918629:role/<role-name>` |
-| `TF_STATE_BUCKET` | `homeys3f1` |
+| `TF_STATE_BUCKET` | `ec-sdwan-aws-s3` |
 | `AWS_REGION` | `us-east-2` |
 | `TF_STATE_KEY` | `sdwan/v4/terraform.tfstate` |
 | `TF_NAME_PREFIX` | `sdwan-v4-lab` |
@@ -124,7 +124,7 @@ terraform apply sdwan.tfplan
 The configured state bucket for this deployment is:
 
 ```text
-homeys3f1
+ec-sdwan-aws-s3
 ```
 
 The default state key is:

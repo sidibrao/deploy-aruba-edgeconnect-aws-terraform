@@ -58,7 +58,7 @@ Set these in GitHub under `Settings -> Secrets and variables -> Actions -> Varia
 | Variable | Required | Example |
 |---|---:|---|
 | `AWS_ROLE_ARN` | Yes | `arn:aws:iam::609330918629:role/sdwan-terraform-github-actions` |
-| `TF_STATE_BUCKET` | Yes | `homeys3f1` |
+| `TF_STATE_BUCKET` | Yes | `ec-sdwan-aws-s3` |
 | `AWS_REGION` | No | `us-east-2` |
 | `TF_STATE_KEY` | No | `sdwan/v4/terraform.tfstate` |
 | `TF_NAME_PREFIX` | No | `sdwan-v4-lab` |
