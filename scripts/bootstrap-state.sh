@@ -26,7 +26,7 @@ aws s3api put-public-access-block \
 
 aws s3api put-bucket-ownership-controls \
   --bucket "$bucket" \
-  --ownership-controls 'ObjectOwnership=BucketOwnerEnforced'
+  --ownership-controls '{"Rules":[{"ObjectOwnership":"BucketOwnerEnforced"}]}'
 
 aws s3api put-bucket-versioning \
   --bucket "$bucket" \
