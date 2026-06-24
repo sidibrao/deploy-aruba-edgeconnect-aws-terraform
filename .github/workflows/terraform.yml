@@ -1,0 +1,97 @@
+name: Terraform SD-WAN
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the approved Terraform plan
+        required: true
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - "*.tf"
+      - "**/*.tf"
+      - "lambda/**"
+      - ".github/workflows/terraform.yml"
+      - "scripts/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "*.tf"
+      - "**/*.tf"
+      - "lambda/**"
+      - ".github/workflows/terraform.yml"
+      - "scripts/**"
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'sdwan/v4/terraform.tfstate' }}
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  terraform:
+    name: Validate and plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required repository variables
+        run: |
+          test -n "${{ vars.AWS_ROLE_ARN }}" || (echo "Missing repository variable AWS_ROLE_ARN" && exit 1)
+          test -n "${{ vars.TF_STATE_BUCKET }}" || (echo "Missing repository variable TF_STATE_BUCKET" && exit 1)
+
+      - name: Configure AWS credentials
+        uses: sidibrao/configure-aws-credentials-sid@main
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: sdwan-terraform
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.5"
+
+      - name: Ensure state backend prerequisites
+        run: bash scripts/bootstrap-state.sh "${{ vars.TF_STATE_BUCKET }}" "${{ env.AWS_REGION }}" "${{ env.TF_STATE_KEY }}"
+
+      - name: Write Terraform variable overrides
+        env:
+          TF_AWS_REGION: ${{ env.AWS_REGION }}
+          TF_NAME_PREFIX: ${{ vars.TF_NAME_PREFIX }}
+          TF_KEY_PAIR_NAME: ${{ vars.TF_KEY_PAIR_NAME }}
+          TF_RESTRICTED_IP: ${{ vars.TF_RESTRICTED_IP }}
+          TF_ADMIN_EMAIL: ${{ vars.TF_ADMIN_EMAIL }}
+          TF_ARUBA_INSTANCE_TYPE: ${{ vars.TF_ARUBA_INSTANCE_TYPE }}
+          TF_COMPUTE_INSTANCE_TYPE: ${{ vars.TF_COMPUTE_INSTANCE_TYPE }}
+          TF_DEV_INSTANCE_TYPE: ${{ vars.TF_DEV_INSTANCE_TYPE }}
+          TF_ARUBA_AMI_ID: ${{ vars.TF_ARUBA_AMI_ID }}
+          TF_ALB_CERTIFICATE_ARN: ${{ vars.TF_ALB_CERTIFICATE_ARN }}
+          TF_BACKEND_WEB_PORT: ${{ vars.TF_BACKEND_WEB_PORT }}
+        run: bash scripts/write-github-tfvars.sh
+
+      - name: Terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -out sdwan.tfplan
+
+      - name: Terraform apply
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
+        run: terraform apply -auto-approve sdwan.tfplan

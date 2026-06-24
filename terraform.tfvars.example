@@ -1,0 +1,13 @@
+aws_region     = "us-east-2"
+name_prefix    = "sdwan-v4-lab"
+key_pair_name  = "AWS-sid-EC-KP"
+restricted_ip  = "184.147.66.76/32"
+admin_email    = ""
+
+aruba_instance_type   = "c5.xlarge"
+compute_instance_type = "t3.micro"
+dev_instance_type     = "t3.micro"
+aruba_ami_id          = "ami-02907b22e4a6ce1bd"
+
+alb_certificate_arn = ""
+backend_web_port    = 80

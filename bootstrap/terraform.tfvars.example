@@ -1,0 +1,3 @@
+aws_region        = "us-east-2"
+state_bucket_name = "homeys3f1"
+state_key         = "sdwan/v4/terraform.tfstate"

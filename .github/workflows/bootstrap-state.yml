@@ -1,0 +1,39 @@
+name: Bootstrap Terraform State
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'sdwan/v4/terraform.tfstate' }}
+
+jobs:
+  bootstrap-state:
+    name: Create or update S3 backend prerequisites
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required repository variables
+        run: |
+          test -n "${{ vars.AWS_ROLE_ARN }}" || (echo "Missing repository variable AWS_ROLE_ARN" && exit 1)
+          test -n "${{ vars.TF_STATE_BUCKET }}" || (echo "Missing repository variable TF_STATE_BUCKET" && exit 1)
+
+      - name: Configure AWS credentials
+        uses: sidibrao/configure-aws-credentials-sid@main
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: sdwan-bootstrap
+
+      - name: Bootstrap state bucket
+        run: bash scripts/bootstrap-state.sh "${{ vars.TF_STATE_BUCKET }}" "${{ env.AWS_REGION }}" "${{ env.TF_STATE_KEY }}"
+
+      - name: Verify caller
+        run: aws sts get-caller-identity

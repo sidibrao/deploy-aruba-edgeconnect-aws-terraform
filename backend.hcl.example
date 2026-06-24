@@ -1,0 +1,5 @@
+bucket         = "homeys3f1"
+key            = "sdwan/v4/terraform.tfstate"
+region         = "us-east-2"
+encrypt        = true
+use_lockfile   = true
