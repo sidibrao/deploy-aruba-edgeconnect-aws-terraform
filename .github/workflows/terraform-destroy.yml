@@ -167,6 +167,61 @@ jobs:
             done
           done
 
+      - name: Delete Transit Gateway VPN attachments
+        run: |
+          tgw_resources="$(terraform state list | grep '^aws_ec2_transit_gateway\.' || true)"
+
+          if [ -z "$tgw_resources" ]; then
+            echo "No Transit Gateway remains in state."
+            exit 0
+          fi
+
+          state_id() {
+            terraform state show -no-color "$1" 2>/dev/null \
+              | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' \
+              | head -n 1
+          }
+
+          for addr in $tgw_resources; do
+            tgw_id="$(state_id "$addr")"
+
+            if [ -z "$tgw_id" ]; then
+              echo "$addr has no Transit Gateway id; skipping."
+              continue
+            fi
+
+            echo "Checking VPN attachments for $tgw_id from $addr."
+
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              vpn_rows="$(
+                aws ec2 describe-transit-gateway-attachments \
+                  --filters "Name=transit-gateway-id,Values=$tgw_id" "Name=resource-type,Values=vpn" \
+                  --query 'TransitGatewayAttachments[?State!=`deleted`].[TransitGatewayAttachmentId,ResourceId,State]' \
+                  --output text 2>/dev/null || true
+              )"
+
+              if [ -z "$vpn_rows" ] || [ "$vpn_rows" = "None" ]; then
+                echo "$tgw_id has no remaining VPN attachments."
+                break
+              fi
+
+              echo "$vpn_rows" | while read -r attachment_id vpn_id state; do
+                [ -n "$attachment_id" ] || continue
+                echo "VPN attachment $attachment_id is $state for $vpn_id."
+
+                if [ -n "$vpn_id" ] && [ "$vpn_id" != "None" ] && [ "$state" != "deleting" ]; then
+                  echo "Deleting VPN connection $vpn_id for attachment $attachment_id."
+                  aws ec2 delete-vpn-connection --vpn-connection-id "$vpn_id" || true
+                fi
+              done
+
+              if [ "$attempt" -lt 10 ]; then
+                echo "Waiting for TGW VPN attachment deletion to settle..."
+                sleep 30
+              fi
+            done
+          done
+
       - name: Terraform destroy plan
         run: terraform plan -destroy -out destroy.tfplan
 
