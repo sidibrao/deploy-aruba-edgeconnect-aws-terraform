@@ -115,6 +115,58 @@ jobs:
             echo "aws_lb.public is already absent from state; skipping load balancer deletion protection."
           fi
 
+      - name: Disassociate Transit Gateway route tables
+        run: |
+          tgw_route_tables="$(terraform state list | grep '^aws_ec2_transit_gateway_route_table\.' || true)"
+
+          if [ -z "$tgw_route_tables" ]; then
+            echo "No Transit Gateway route tables remain in state."
+            exit 0
+          fi
+
+          state_id() {
+            terraform state show -no-color "$1" 2>/dev/null \
+              | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' \
+              | head -n 1
+          }
+
+          for addr in $tgw_route_tables; do
+            route_table_id="$(state_id "$addr")"
+
+            if [ -z "$route_table_id" ]; then
+              echo "$addr has no route table id; skipping."
+              continue
+            fi
+
+            echo "Checking associations for $route_table_id from $addr."
+
+            for attempt in 1 2 3 4 5 6; do
+              attachment_ids="$(
+                aws ec2 get-transit-gateway-route-table-associations \
+                  --transit-gateway-route-table-id "$route_table_id" \
+                  --query 'Associations[].TransitGatewayAttachmentId' \
+                  --output text 2>/dev/null || true
+              )"
+
+              if [ -z "$attachment_ids" ] || [ "$attachment_ids" = "None" ]; then
+                echo "$route_table_id has no remaining associations."
+                break
+              fi
+
+              for attachment_id in $attachment_ids; do
+                echo "Disassociating $attachment_id from $route_table_id."
+                aws ec2 disassociate-transit-gateway-route-table \
+                  --transit-gateway-route-table-id "$route_table_id" \
+                  --transit-gateway-attachment-id "$attachment_id" || true
+              done
+
+              if [ "$attempt" -lt 6 ]; then
+                echo "Waiting for TGW disassociation to settle..."
+                sleep 15
+              fi
+            done
+          done
+
       - name: Terraform destroy plan
         run: terraform plan -destroy -out destroy.tfplan
 
