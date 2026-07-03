@@ -1,0 +1,89 @@
+name: Terraform Destroy SD-WAN
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DESTROY to destroy the full SD-WAN lab
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  destroy:
+    name: Destroy lab
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check destroy confirmation
+        run: |
+          test "${{ inputs.confirm }}" = "DESTROY" || (echo "Type DESTROY to run this workflow" && exit 1)
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load deployment defaults
+        id: deployment
+        run: bash scripts/load-deployment-env.sh
+
+      - name: Check required repository variables
+        run: |
+          test -n "${{ vars.AWS_ROLE_ARN }}" || (echo "Missing repository variable AWS_ROLE_ARN" && exit 1)
+
+      - name: Configure AWS credentials
+        uses: sidibrao/configure-aws-credentials-sid@main
+        with:
+          aws-region: ${{ vars.AWS_REGION || steps.deployment.outputs.aws_region }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: sdwan-terraform-destroy
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.5"
+
+      - name: Ensure state backend prerequisites
+        run: bash scripts/bootstrap-state.sh "$TF_STATE_BUCKET" "$AWS_REGION" "$TF_STATE_KEY"
+
+      - name: Write Terraform variable overrides
+        env:
+          TF_AWS_REGION: ${{ vars.AWS_REGION || steps.deployment.outputs.aws_region }}
+          TF_NAME_PREFIX: ${{ vars.TF_NAME_PREFIX }}
+          TF_KEY_PAIR_NAME: ${{ vars.TF_KEY_PAIR_NAME }}
+          TF_RESTRICTED_IP: ${{ vars.TF_RESTRICTED_IP }}
+          TF_ADMIN_EMAIL: ${{ vars.TF_ADMIN_EMAIL }}
+          TF_ARUBA_INSTANCE_TYPE: ${{ vars.TF_ARUBA_INSTANCE_TYPE }}
+          TF_COMPUTE_INSTANCE_TYPE: ${{ vars.TF_COMPUTE_INSTANCE_TYPE }}
+          TF_DEV_INSTANCE_TYPE: ${{ vars.TF_DEV_INSTANCE_TYPE }}
+          TF_ARUBA_AMI_ID: ${{ vars.TF_ARUBA_AMI_ID }}
+          TF_ALB_CERTIFICATE_ARN: ${{ vars.TF_ALB_CERTIFICATE_ARN }}
+          TF_BACKEND_WEB_PORT: ${{ vars.TF_BACKEND_WEB_PORT }}
+        run: bash scripts/write-github-tfvars.sh
+
+      - name: Allow protected resources to be destroyed
+        run: echo 'allow_destroy = true' >> github.auto.tfvars
+
+      - name: Terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Disable deletion protection
+        run: terraform apply -auto-approve
+
+      - name: Terraform destroy plan
+        run: terraform plan -destroy -out destroy.tfplan
+
+      - name: Terraform destroy
+        run: terraform apply -auto-approve destroy.tfplan

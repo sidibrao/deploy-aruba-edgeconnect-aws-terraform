@@ -13,7 +13,7 @@ resource "aws_lb" "public" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = [aws_subnet.hub_mgmt_az1.id, aws_subnet.hub_mgmt_az2.id]
 
-  enable_deletion_protection = true
+  enable_deletion_protection = !var.allow_destroy
 
   tags = { Name = "Public-ALB" }
 }
@@ -154,7 +154,7 @@ resource "aws_instance" "aruba1" {
   instance_type           = var.aruba_instance_type
   key_name                = var.key_pair_name
   monitoring              = true
-  disable_api_termination = true
+  disable_api_termination = !var.allow_destroy
 
   metadata_options {
     http_tokens                 = "optional"
@@ -186,7 +186,7 @@ resource "aws_instance" "aruba2" {
   instance_type           = var.aruba_instance_type
   key_name                = var.key_pair_name
   monitoring              = true
-  disable_api_termination = true
+  disable_api_termination = !var.allow_destroy
 
   metadata_options {
     http_tokens                 = "optional"

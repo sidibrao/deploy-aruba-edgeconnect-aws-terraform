@@ -82,6 +82,12 @@ variable "target_registration_lambda_role_arn" {
   description = "Optional existing IAM role ARN for the Lambda target-registration function. Leave blank to create one."
 }
 
+variable "allow_destroy" {
+  type        = bool
+  default     = false
+  description = "Set true only in the destroy workflow to disable EC2 and ALB deletion protection before destroying the lab."
+}
+
 variable "hub_vpc_cidr" {
   type    = string
   default = "10.160.0.0/16"
