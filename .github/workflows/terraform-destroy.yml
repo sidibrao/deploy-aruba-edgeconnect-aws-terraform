@@ -81,25 +81,39 @@ jobs:
 
       - name: Disable deletion protection
         run: |
-          aruba1_id="$(terraform state show -no-color aws_instance.aruba1 | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
-          aruba2_id="$(terraform state show -no-color aws_instance.aruba2 | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
-          alb_arn="$(terraform state show -no-color aws_lb.public | sed -n 's/^ *arn *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
+          state_attr() {
+            terraform state show -no-color "$1" 2>/dev/null \
+              | sed -n "s/^ *$2 *= *\"\{0,1\}\([^\"]*\)\"\{0,1\}$/\1/p" \
+              | head -n 1
+          }
 
-          test -n "$aruba1_id"
-          test -n "$aruba2_id"
-          test -n "$alb_arn"
+          aruba1_id="$(state_attr aws_instance.aruba1 id)"
+          aruba2_id="$(state_attr aws_instance.aruba2 id)"
+          alb_arn="$(state_attr aws_lb.public arn)"
 
-          aws ec2 modify-instance-attribute \
-            --instance-id "$aruba1_id" \
-            --disable-api-termination '{"Value": false}'
+          if [ -n "$aruba1_id" ]; then
+            aws ec2 modify-instance-attribute \
+              --instance-id "$aruba1_id" \
+              --disable-api-termination '{"Value": false}'
+          else
+            echo "aws_instance.aruba1 is already absent from state; skipping termination protection."
+          fi
 
-          aws ec2 modify-instance-attribute \
-            --instance-id "$aruba2_id" \
-            --disable-api-termination '{"Value": false}'
+          if [ -n "$aruba2_id" ]; then
+            aws ec2 modify-instance-attribute \
+              --instance-id "$aruba2_id" \
+              --disable-api-termination '{"Value": false}'
+          else
+            echo "aws_instance.aruba2 is already absent from state; skipping termination protection."
+          fi
 
-          aws elbv2 modify-load-balancer-attributes \
-            --load-balancer-arn "$alb_arn" \
-            --attributes Key=deletion_protection.enabled,Value=false
+          if [ -n "$alb_arn" ]; then
+            aws elbv2 modify-load-balancer-attributes \
+              --load-balancer-arn "$alb_arn" \
+              --attributes Key=deletion_protection.enabled,Value=false
+          else
+            echo "aws_lb.public is already absent from state; skipping load balancer deletion protection."
+          fi
 
       - name: Terraform destroy plan
         run: terraform plan -destroy -out destroy.tfplan
