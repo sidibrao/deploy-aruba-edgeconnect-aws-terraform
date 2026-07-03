@@ -11,3 +11,20 @@ aruba_ami_id          = "ami-02907b22e4a6ce1bd"
 
 alb_certificate_arn = ""
 backend_web_port    = 80
+
+# Optional TGW VPN connections. Leave empty unless you want Terraform to create
+# and own the customer gateway, VPN connection, TGW association, propagation,
+# and static routes.
+tgw_vpn_connections = {
+  # branch1 = {
+  #   customer_gateway_ip      = "203.0.113.10"
+  #   customer_gateway_bgp_asn = 65000
+  #   static_routes_only       = true
+  #   route_table              = "spoke"
+  #   destination_cidr_blocks  = ["192.168.10.0/24"]
+  #
+  #   # Optional. Omit these to let AWS generate tunnel keys.
+  #   # tunnel1_preshared_key = "replace-with-strong-key"
+  #   # tunnel2_preshared_key = "replace-with-strong-key"
+  # }
+}

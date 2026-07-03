@@ -12,6 +12,9 @@ backend.
 - Hub / SD-WAN VPC, Compute VPC, Dev VPC, and Egress VPC
 - Two-AZ subnet layout in `us-east-2`
 - Transit Gateway hub-spoke routing
+- Explicit Transit Gateway association and propagation for Hub, Egress, Compute,
+  and Dev VPC attachments
+- Optional Terraform-managed Transit Gateway VPN connections
 - Centralized Egress VPC NAT path
 - Two Aruba EdgeConnect / EC-V nodes
 - Six Aruba ENIs and six Aruba public EIPs
@@ -122,7 +125,27 @@ TF_ARUBA_INSTANCE_TYPE
 TF_COMPUTE_INSTANCE_TYPE
 TF_DEV_INSTANCE_TYPE
 TF_BACKEND_WEB_PORT
+TF_TGW_VPN_CONNECTIONS_JSON
 ```
+
+`TF_TGW_VPN_CONNECTIONS_JSON` is optional. Leave it unset unless you want
+Terraform to create and own site-to-site VPN connections attached to the Transit
+Gateway. Example value:
+
+```json
+{
+  "branch1": {
+    "customer_gateway_ip": "203.0.113.10",
+    "customer_gateway_bgp_asn": 65000,
+    "static_routes_only": true,
+    "route_table": "spoke",
+    "destination_cidr_blocks": ["192.168.10.0/24"]
+  }
+}
+```
+
+Use `route_table = "spoke"` for branch/spoke VPNs. Use `route_table = "hub"`
+only when the VPN should attach to the hub-side TGW route table.
 
 ## Local Validation
 

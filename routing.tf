@@ -158,6 +158,32 @@ resource "aws_ec2_transit_gateway_route_table_association" "egress" {
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.hub.id
 }
 
+locals {
+  spoke_tgw_attachment_ids = {
+    compute = aws_ec2_transit_gateway_vpc_attachment.compute.id
+    dev     = aws_ec2_transit_gateway_vpc_attachment.dev.id
+  }
+
+  hub_tgw_attachment_ids = {
+    hub    = aws_ec2_transit_gateway_vpc_attachment.hub.id
+    egress = aws_ec2_transit_gateway_vpc_attachment.egress.id
+  }
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "spoke_vpcs" {
+  for_each = local.spoke_tgw_attachment_ids
+
+  transit_gateway_attachment_id  = each.value
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "hub_vpcs" {
+  for_each = local.hub_tgw_attachment_ids
+
+  transit_gateway_attachment_id  = each.value
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.hub.id
+}
+
 resource "aws_ec2_transit_gateway_route" "spoke_default_to_egress" {
   destination_cidr_block         = "0.0.0.0/0"
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.egress.id
@@ -180,6 +206,91 @@ resource "aws_ec2_transit_gateway_route" "hub_to_dev" {
   destination_cidr_block         = var.dev_vpc_cidr
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.dev.id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.hub.id
+}
+
+locals {
+  tgw_vpn_route_tables = {
+    for name, vpn in var.tgw_vpn_connections : name => lower(vpn.route_table)
+  }
+
+  tgw_vpn_static_routes = merge(concat([{}], [
+    for vpn_name, vpn in var.tgw_vpn_connections : {
+      for cidr in vpn.destination_cidr_blocks : "${vpn_name}-${replace(cidr, "/", "_")}" => {
+        vpn_name    = vpn_name
+        destination = cidr
+        route_table = lower(vpn.route_table)
+      } if vpn.static_routes_only
+    }
+  ])...)
+}
+
+resource "aws_customer_gateway" "tgw_vpn" {
+  for_each = var.tgw_vpn_connections
+
+  bgp_asn    = each.value.customer_gateway_bgp_asn
+  ip_address = each.value.customer_gateway_ip
+  type       = "ipsec.1"
+
+  tags = {
+    Name = "${var.name_prefix}-${each.key}-cgw"
+  }
+}
+
+resource "aws_vpn_connection" "tgw" {
+  for_each = var.tgw_vpn_connections
+
+  customer_gateway_id = aws_customer_gateway.tgw_vpn[each.key].id
+  transit_gateway_id  = aws_ec2_transit_gateway.main.id
+  type                = "ipsec.1"
+  static_routes_only  = each.value.static_routes_only
+
+  tunnel1_preshared_key = each.value.tunnel1_preshared_key
+  tunnel2_preshared_key = each.value.tunnel2_preshared_key
+
+  tags = {
+    Name = "${var.name_prefix}-${each.key}-vpn"
+  }
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "vpn" {
+  for_each = aws_vpn_connection.tgw
+
+  transit_gateway_attachment_id = each.value.transit_gateway_attachment_id
+  transit_gateway_route_table_id = (
+    local.tgw_vpn_route_tables[each.key] == "hub"
+    ? aws_ec2_transit_gateway_route_table.hub.id
+    : aws_ec2_transit_gateway_route_table.spoke.id
+  )
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpn" {
+  for_each = aws_vpn_connection.tgw
+
+  transit_gateway_attachment_id = each.value.transit_gateway_attachment_id
+  transit_gateway_route_table_id = (
+    local.tgw_vpn_route_tables[each.key] == "hub"
+    ? aws_ec2_transit_gateway_route_table.hub.id
+    : aws_ec2_transit_gateway_route_table.spoke.id
+  )
+}
+
+resource "aws_vpn_connection_route" "tgw_static" {
+  for_each = local.tgw_vpn_static_routes
+
+  vpn_connection_id      = aws_vpn_connection.tgw[each.value.vpn_name].id
+  destination_cidr_block = each.value.destination
+}
+
+resource "aws_ec2_transit_gateway_route" "vpn_static" {
+  for_each = local.tgw_vpn_static_routes
+
+  destination_cidr_block        = each.value.destination
+  transit_gateway_attachment_id = aws_vpn_connection.tgw[each.value.vpn_name].transit_gateway_attachment_id
+  transit_gateway_route_table_id = (
+    each.value.route_table == "hub"
+    ? aws_ec2_transit_gateway_route_table.hub.id
+    : aws_ec2_transit_gateway_route_table.spoke.id
+  )
 }
 
 resource "aws_route_table" "compute" {

@@ -68,6 +68,7 @@ jobs:
           TF_ARUBA_AMI_ID: ${{ vars.TF_ARUBA_AMI_ID }}
           TF_ALB_CERTIFICATE_ARN: ${{ vars.TF_ALB_CERTIFICATE_ARN }}
           TF_BACKEND_WEB_PORT: ${{ vars.TF_BACKEND_WEB_PORT }}
+          TF_TGW_VPN_CONNECTIONS_JSON: ${{ vars.TF_TGW_VPN_CONNECTIONS_JSON }}
         run: bash scripts/write-github-tfvars.sh
 
       - name: Allow protected resources to be destroyed

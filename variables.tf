@@ -107,3 +107,24 @@ variable "egress_vpc_cidr" {
   type    = string
   default = "10.163.0.0/16"
 }
+
+variable "tgw_vpn_connections" {
+  type = map(object({
+    customer_gateway_ip      = string
+    customer_gateway_bgp_asn = optional(number, 65000)
+    static_routes_only       = optional(bool, true)
+    destination_cidr_blocks  = optional(list(string), [])
+    route_table              = optional(string, "spoke")
+    tunnel1_preshared_key    = optional(string)
+    tunnel2_preshared_key    = optional(string)
+  }))
+  default     = {}
+  description = "Optional site-to-site VPN connections attached to the Transit Gateway. Use route_table = spoke or hub."
+
+  validation {
+    condition = alltrue([
+      for _, vpn in var.tgw_vpn_connections : contains(["spoke", "hub"], lower(vpn.route_table))
+    ])
+    error_message = "Each TGW VPN connection route_table must be either spoke or hub."
+  }
+}

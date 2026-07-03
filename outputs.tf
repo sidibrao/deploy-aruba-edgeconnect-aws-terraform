@@ -8,6 +8,26 @@ output "transit_gateway_id" {
   value       = aws_ec2_transit_gateway.main.id
 }
 
+output "tgw_vpn_connection_ids" {
+  description = "Terraform-managed TGW VPN connection IDs."
+  value       = { for name, vpn in aws_vpn_connection.tgw : name => vpn.id }
+}
+
+output "tgw_vpn_attachment_ids" {
+  description = "Terraform-managed TGW VPN attachment IDs."
+  value       = { for name, vpn in aws_vpn_connection.tgw : name => vpn.transit_gateway_attachment_id }
+}
+
+output "tgw_vpn_tunnel_addresses" {
+  description = "Terraform-managed VPN tunnel outside addresses."
+  value = {
+    for name, vpn in aws_vpn_connection.tgw : name => {
+      tunnel1_address = vpn.tunnel1_address
+      tunnel2_address = vpn.tunnel2_address
+    }
+  }
+}
+
 output "aruba_node_1_mgmt_eip" {
   description = "Aruba Node 1 management public IP."
   value       = aws_eip.aruba1_mgmt.public_ip

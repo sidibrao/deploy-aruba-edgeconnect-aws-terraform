@@ -39,6 +39,16 @@ write_number() {
   fi
 }
 
+write_hcl() {
+  local name="$1"
+  local value
+  value="$(trim "$2")"
+
+  if [ -n "$value" ]; then
+    printf '%s = %s\n' "$name" "$value" >> "$out"
+  fi
+}
+
 write_string "aws_region" "${TF_AWS_REGION:-}"
 write_string "name_prefix" "${TF_NAME_PREFIX:-}"
 write_string "key_pair_name" "${TF_KEY_PAIR_NAME:-}"
@@ -50,5 +60,6 @@ write_string "dev_instance_type" "${TF_DEV_INSTANCE_TYPE:-}"
 write_string "aruba_ami_id" "${TF_ARUBA_AMI_ID:-}"
 write_string "alb_certificate_arn" "${TF_ALB_CERTIFICATE_ARN:-}"
 write_number "backend_web_port" "${TF_BACKEND_WEB_PORT:-}"
+write_hcl "tgw_vpn_connections" "${TF_TGW_VPN_CONNECTIONS_JSON:-}"
 
 echo "Wrote $out"
