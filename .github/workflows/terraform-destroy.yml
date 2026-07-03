@@ -80,7 +80,26 @@ jobs:
         run: terraform validate
 
       - name: Disable deletion protection
-        run: terraform apply -auto-approve
+        run: |
+          aruba1_id="$(terraform state show -no-color aws_instance.aruba1 | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
+          aruba2_id="$(terraform state show -no-color aws_instance.aruba2 | sed -n 's/^ *id *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
+          alb_arn="$(terraform state show -no-color aws_lb.public | sed -n 's/^ *arn *= *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -n 1)"
+
+          test -n "$aruba1_id"
+          test -n "$aruba2_id"
+          test -n "$alb_arn"
+
+          aws ec2 modify-instance-attribute \
+            --instance-id "$aruba1_id" \
+            --disable-api-termination '{"Value": false}'
+
+          aws ec2 modify-instance-attribute \
+            --instance-id "$aruba2_id" \
+            --disable-api-termination '{"Value": false}'
+
+          aws elbv2 modify-load-balancer-attributes \
+            --load-balancer-arn "$alb_arn" \
+            --attributes Key=deletion_protection.enabled,Value=false
 
       - name: Terraform destroy plan
         run: terraform plan -destroy -out destroy.tfplan
