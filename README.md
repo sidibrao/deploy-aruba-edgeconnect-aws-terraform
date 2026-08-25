@@ -1,55 +1,59 @@
-# Aruba EdgeConnect AWS Terraform Deployment
+# Aruba EdgeConnect AWS Terraform Lab
 
-Terraform deployment for an Aruba EdgeConnect / EC-V SD-WAN lab on AWS.
+Deploy the Aruba EdgeConnect SD-WAN hub AWS lab with Terraform, remote state, and GitHub Actions support.
 
-This project is the Terraform version of the earlier CloudFormation-based SD-WAN
-design. The topology image can be added later; for now the repository is set up
-for repeatable deployment through GitHub Actions and an S3 Terraform state
-backend.
+This repository is the Terraform implementation of the CloudFormation-based Aruba EdgeConnect design. It keeps the same business topology while making the deployment easier to review, version, automate, and promote through repeatable infrastructure-as-code workflows.
+
+## Business Case
+
+Cloud and network teams often need to validate SD-WAN designs before production rollout. This project provides a Terraform-based lab for:
+
+- Deploying Aruba EdgeConnect virtual appliances in AWS
+- Testing high-availability SD-WAN hub placement across two Availability Zones
+- Validating AWS Transit Gateway hub-and-spoke routing
+- Demonstrating centralized internet egress through a dedicated Egress VPC
+- Testing application reachability through a public Application Load Balancer
+- Practicing GitHub Actions-based Terraform plan/apply workflows
+
+Use the CloudFormation repository for a single-template deployment. Use this Terraform repository when you want modular IaC, remote state, CI/CD, reviewable plans, and safer long-term iteration.
+
+## Topology
+
+![Aruba SD-WAN HA Hub with Transit Gateway and Egress VPC](images/aruba-sdwan-ha-hub-tgw-egress-vpc.png)
 
 ## What This Builds
 
-- Hub / SD-WAN VPC, Compute VPC, Dev VPC, and Egress VPC
-- Two-AZ subnet layout in `us-east-2`
-- Transit Gateway hub-spoke routing
-- Explicit Transit Gateway association and propagation for Hub, Egress, Compute,
-  and Dev VPC attachments
-- Optional Terraform-managed Transit Gateway VPN connections
-- Centralized Egress VPC NAT path
-- Two Aruba EdgeConnect / EC-V nodes
-- Six Aruba ENIs and six Aruba public EIPs
-- Public Application Load Balancer in the Hub VPC
-- Compute Auto Scaling Group web targets
-- Static Dev Linux web targets
-- Lambda-based ALB target registration
-- VPC Flow Logs
-- S3 remote state backend support with native S3 lockfile
+| Area | Resources |
+|---|---|
+| Hub VPC | Public ALB, Aruba management/WAN/LAN subnets, internet gateway |
+| Aruba EdgeConnect | Two EC-V nodes across two Availability Zones |
+| Transit Gateway | Hub, Compute, Dev, and Egress VPC attachments with explicit association and propagation |
+| Optional VPN | Terraform-managed TGW VPN connections for branch/spoke testing |
+| Compute VPC | Auto Scaling Linux web targets |
+| Dev VPC | Static Linux web targets |
+| Egress VPC | NAT gateways for centralized outbound access |
+| Automation | Lambda-based ALB target registration |
+| Observability | VPC Flow Logs, CloudWatch support, SNS hooks |
+| Delivery | S3 remote state and GitHub Actions workflows |
 
 ## Repository Structure
 
 ```text
 .
 ├── .github/workflows/
-│   ├── bootstrap-state.yml        # Creates/verifies S3 backend prerequisites
-│   └── terraform.yml              # Terraform fmt, validate, plan, and apply
-├── bootstrap/                     # Optional standalone Terraform state bootstrap
+│   ├── bootstrap-state.yml
+│   ├── terraform.yml
+│   └── terraform-destroy.yml
+├── bootstrap/
 ├── config/
-│   └── deployment.env             # Project deployment defaults
 ├── docs/
-│   ├── architecture.md            # Current architecture notes
-│   ├── bootstrap.md               # Manual backend bootstrap runbook
-│   ├── github-actions.md          # GitHub Actions deployment setup
-│   └── operations.md              # Drift and deletion-protection notes
+├── images/
 ├── lambda/
-│   └── target_registration.py     # ALB target registration Lambda
 ├── prerequisites/
-│   └── github-actions-oidc-role.yml
 ├── scripts/
-│   ├── bootstrap-state.sh         # Idempotent S3 backend setup for CI
-│   └── write-github-tfvars.sh     # Converts GitHub variables to auto.tfvars
-├── backend.hcl.example            # Example S3 backend config
-├── terraform.tfvars.example       # Example local deployment variables
-├── versions.tf                    # Terraform/provider/backend settings
+├── backend.hcl.example
+├── terraform.tfvars.example
+├── versions.tf
 ├── variables.tf
 ├── network.tf
 ├── security.tf
@@ -58,24 +62,21 @@ backend.
 └── outputs.tf
 ```
 
-## Recommended Deployment Path
+## Deployment Model
 
-Use GitHub Actions as the source of truth for the final deployment.
+Recommended path:
 
-1. Configure the AWS IAM role trust policy so this repo can assume it through
-   GitHub OIDC.
-2. Add the GitHub repository variable `AWS_ROLE_ARN`.
-3. Run the `Bootstrap Terraform State` workflow.
-4. Run the `Terraform SD-WAN` workflow with `apply = false`.
+1. Bootstrap the Terraform state backend.
+2. Configure GitHub Actions OIDC access to AWS.
+3. Run Terraform format and validation.
+4. Generate a Terraform plan.
 5. Review the plan.
-6. Run the `Terraform SD-WAN` workflow again with `apply = true`.
-
-See [docs/github-actions.md](docs/github-actions.md) for the complete GitHub
-setup.
+6. Apply from GitHub Actions.
+7. Use outputs to test ALB and Aruba access.
 
 ## Deployment Defaults
 
-Project-owned deployment defaults live in:
+Project defaults live in:
 
 ```text
 config/deployment.env
@@ -89,10 +90,18 @@ TF_STATE_BUCKET=ec-sdwan-aws-s3
 TF_STATE_KEY=sdwan/v4/terraform.tfstate
 ```
 
-Update that file when you want to change the project state bucket for both local
-helper scripts and GitHub Actions.
+## Required Inputs
 
-## Required GitHub Variable
+| Input | Description |
+|---|---|
+| `key_pair_name` | EC2 key pair for access |
+| `restricted_ip` | Admin public IP/CIDR allowed to access Aruba management |
+| `aruba_ami_id` | Aruba EC-V AMI ID for the deployment Region |
+| `aruba_instance_type` | Aruba EC-V instance size |
+| `admin_email` | Optional alarm notification email |
+| `alb_certificate_arn` | Optional ACM certificate ARN for HTTPS |
+
+## GitHub Actions Variables
 
 Set these under:
 
@@ -102,21 +111,16 @@ Settings -> Secrets and variables -> Actions -> Variables
 
 | Variable | Example |
 |---|---|
-| `AWS_ROLE_ARN` | `arn:aws:iam::609330918629:role/<role-name>` |
-
-GitHub variables can optionally override values from `config/deployment.env`:
-
-| Optional Override | Example |
-|---|---|
-| `TF_STATE_BUCKET` | `ec-sdwan-aws-s3` |
+| `AWS_ROLE_ARN` | `arn:aws:iam::<account-id>:role/<github-actions-role>` |
 | `AWS_REGION` | `us-east-2` |
+| `TF_STATE_BUCKET` | `ec-sdwan-aws-s3` |
 | `TF_STATE_KEY` | `sdwan/v4/terraform.tfstate` |
 | `TF_NAME_PREFIX` | `sdwan-v4-lab` |
 | `TF_KEY_PAIR_NAME` | `AWS-sid-EC-KP` |
 | `TF_RESTRICTED_IP` | `x.x.x.x/32` |
-| `TF_ARUBA_AMI_ID` | `ami-02907b22e4a6ce1bd` |
+| `TF_ARUBA_AMI_ID` | `ami-xxxxxxxxxxxxxxxxx` |
 
-Optional variables:
+Optional:
 
 ```text
 TF_ADMIN_EMAIL
@@ -149,9 +153,6 @@ only when the VPN should attach to the hub-side TGW route table.
 
 ## Local Validation
 
-Local commands are useful for validation and review. The final `apply` should
-normally be run from GitHub Actions.
-
 ```bash
 cp backend.hcl.example backend.hcl
 cp terraform.tfvars.example terraform.tfvars
@@ -161,38 +162,29 @@ terraform validate
 terraform plan -out sdwan.tfplan
 ```
 
-Run local apply only if you intentionally want your local AWS profile to deploy:
+Run local apply only when you intentionally want your local AWS profile to deploy:
 
 ```bash
 terraform apply sdwan.tfplan
 ```
 
-## State Backend
+## Documentation
 
-The configured state bucket for this deployment is:
+| Document | Purpose |
+|---|---|
+| [Architecture](docs/architecture.md) | VPCs, traffic paths, Aruba interfaces, and target registration |
+| [Bootstrap](docs/bootstrap.md) | Terraform backend bootstrap runbook |
+| [GitHub Actions](docs/github-actions.md) | CI/CD setup and required variables |
+| [Operations](docs/operations.md) | Drift checks, deletion protection, and lifecycle notes |
 
-```text
-ec-sdwan-aws-s3
+## Cleanup
+
+Use the destroy workflow or run Terraform destroy intentionally from a controlled environment.
+
+```bash
+terraform destroy
 ```
 
-The default state key is:
+## Cost Notice
 
-```text
-sdwan/v4/terraform.tfstate
-```
-
-Do not commit local backend or variable files:
-
-```text
-backend.hcl
-terraform.tfvars
-bootstrap/terraform.tfvars
-.terraform/
-*.tfplan
-terraform.tfstate*
-```
-
-## Operations
-
-For drift checks, deletion protection, and console-change guidance, see
-[docs/operations.md](docs/operations.md).
+This lab creates billable AWS resources, including EC2 instances, NAT gateways, Elastic IPs, Load Balancer, Transit Gateway attachments, Lambda, CloudWatch, and data processing charges. Destroy the lab when testing is complete.

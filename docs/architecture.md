@@ -2,6 +2,10 @@
 
 This Terraform project mirrors the working CloudFormation v4 design.
 
+## Topology
+
+![Aruba SD-WAN HA Hub with Transit Gateway and Egress VPC](../images/aruba-sdwan-ha-hub-tgw-egress-vpc.png)
+
 ## VPCs
 
 | VPC | CIDR | Purpose |
